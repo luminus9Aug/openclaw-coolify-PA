@@ -3,7 +3,7 @@
 ########################################
 # Stage 1: Base System
 ########################################
-FROM node:22.12.0-bookworm-slim
+FROM node:22.12.0-bookworm-slim AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_ROOT_USER_ACTION=ignore
