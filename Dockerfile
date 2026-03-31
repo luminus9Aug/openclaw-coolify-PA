@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     sqlite3 \
     pass \
     chromium \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # 🔥 CRITICAL FIX (native modules)
