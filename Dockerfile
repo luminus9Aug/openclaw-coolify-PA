@@ -81,9 +81,9 @@ ENV PATH="/usr/local/bin:/usr/local/lib/node_modules/.bin:${PATH}"
 # OpenClaw (npm install)
 RUN --mount=type=cache,target=/data/.npm \
     if [ "$OPENCLAW_BETA" = "true" ]; then \
-    npm install -g openclaw@beta; \
+    bun install -g openclaw@beta; \
     else \
-    npm install -g openclaw; \
+    bun install -g openclaw; \
     fi 
 
 # Make sure uv and other local bins are available
