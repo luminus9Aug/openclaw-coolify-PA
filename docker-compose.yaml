@@ -170,5 +170,3 @@ volumes:
 networks:
   coolify:
     external: true
-  zynithic-networks:
-    external: true
