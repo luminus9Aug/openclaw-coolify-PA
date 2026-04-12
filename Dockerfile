@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Install OpenClaw globally
-RUN npm install -g openclaw
+# RUN npm install -g openclaw
+RUN npm install -g openclaw --production --no-audit --no-fund
 
 # Copy project files
 COPY . .
