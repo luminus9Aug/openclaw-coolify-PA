@@ -1,14 +1,10 @@
 version: "3.9"
 
 services:
-  # =========================
-  # 🔥 OPENCLAW (MAIN SERVICE)
-  # =========================
   openclaw:
     build:
       context: .
-      args:
-        - OPENCLAW_BETA=${OPENCLAW_BETA:-false}
+      dockerfile: Dockerfile
 
     container_name: openclaw
     restart: unless-stopped
@@ -18,154 +14,71 @@ services:
         soft: 65535
         hard: 65535
 
-    env_file:
-      - .env
-
     environment:
-      # =========================
-      # CORE
-      # =========================
+      # ── Core ──────────────────────────────────────────────────────────────
       PORT: 18789
       NODE_ENV: production
       NODE_OPTIONS: --max-old-space-size=1024
 
-      # =========================
-      # FREE LLM (NVIDIA)
-      # =========================
+      # ── LLM Provider ──────────────────────────────────────────────────────
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
 
-      # =========================
-      # SHARED DATABASES (Coolify internal)
-      # =========================
-      REDIS_URL: ${REDIS_URL}
-      MONGODB_URI: ${MONGODB_URI}
-      DATABASE_URL: ${DATABASE_URL}
+      # ── Databases (optional — leave blank if not using external DBs) ───────
+      REDIS_URL: ${REDIS_URL:-}
+      MONGODB_URI: ${MONGODB_URI:-}
+      DATABASE_URL: ${DATABASE_URL:-}
 
-      # =========================
-      # STORAGE
-      # =========================
+      # ── Persistent Storage paths (must match volume mount) ─────────────────
       OPENCLAW_STATE_DIR: /data/.openclaw
-      OPENCLAW_WORKSPACE: /data/workspace
+      OPENCLAW_WORKSPACE: /data/openclaw-workspace
 
-      # =========================
-      # 🔒 SAFETY (IMPORTANT)
-      # =========================
+      # ── Safety: disable Docker-in-Docker sandboxing ───────────────────────
       DOCKER_HOST: ""
       SANDBOX_CONTAINER: "false"
 
-      # =========================
-      # 💰 TOKEN OPTIMIZATION
-      # =========================
+      # ── Token/context optimisation ────────────────────────────────────────
       AGENTS_DEFAULTS_BOOTSTRAP_MAX_CHARS: 3000
-      AGENTS_DEFAULTS_CONTEXT_WINDOW_THRESHOLD: 0.5
+      AGENTS_DEFAULTS_CONTEXT_WINDOW_THRESHOLD: "0.5"
 
-      # =========================
-      # 🧠 LOOP CONTROL
-      # =========================
+      # ── Loop control ──────────────────────────────────────────────────────
       MAX_ITERATIONS: 4
       MAX_TOOL_CALLS: 6
 
-      # =========================
-      # 🌐 PUBLIC ACCESS
-      # =========================
+      # ── Public URL (set automatically by Coolify) ─────────────────────────
       BASE_URL: https://${SERVICE_FQDN_OPENCLAW}
       PUBLIC_URL: https://${SERVICE_FQDN_OPENCLAW}
 
-      # =========================
-      # ⚙️ STABILITY FIXES
-      # =========================
+      # ── File-watch fix for containers ────────────────────────────────────
       CHOKIDAR_USEPOLLING: "true"
 
-      # =========================
-      # 🤖 OPTIONAL (ENABLE LATER)
-      # =========================
+      # ── Optional channels ─────────────────────────────────────────────────
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
 
     volumes:
       - openclaw-data:/data
 
-    ports:
-      - "18789:18789"
+    # expose makes the port reachable by Traefik inside the Docker network
+    # without publishing it directly to the host — this is the correct pattern for Coolify
+    expose:
+      - "18789"
 
     networks:
       - coolify
 
-    command: ["bash", "/app/scripts/bootstrap.sh"]
-
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18789/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:18789/"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 120s
+      retries: 5
+      start_period: 60s
 
-
-  # =====================================
-  # ⚠️ OPTIONAL SERVICES (DISABLED FOR NOW)
-  # =====================================
-
-  # registry:
-  #   image: registry:2
-  #   restart: unless-stopped
-  #   volumes:
-  #     - registry-data:/var/lib/registry
-  #   environment:
-  #     REGISTRY_HTTP_SECRET: ${SERVICE_BASE64_REGISTRY}
-  #   networks:
-  #     - coolify
-
-
-  # docker-proxy:
-  #   image: tecnativa/docker-socket-proxy:latest
-  #   restart: unless-stopped
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   environment:
-  #     POST: 1
-  #     CONTAINERS: 1
-  #     IMAGES: 1
-  #     NETWORKS: 1
-  #     INFO: 1
-  #     VERSION: 1
-  #     EXEC: 1
-  #     EVENTS: 1
-  #   networks:
-  #     - coolify
-
-
-  # searxng:
-  #   build:
-  #     context: .
-  #     dockerfile: searxng/Dockerfile
-  #   restart: unless-stopped
-  #   volumes:
-  #     - searxng-data:/var/lib/searxng
-  #   environment:
-  #     SEARXNG_BASE_URL: http://searxng:8080
-  #     SEARXNG_SERVER_SECRET_KEY: ${SERVICE_BASE64_SEARXNG}
-  #   cap_drop:
-  #     - ALL
-  #   cap_add:
-  #     - CHOWN
-  #     - SETGID
-  #     - SETUID
-  #   networks:
-  #     - coolify
-
-
-# =========================
-# 📦 VOLUMES
-# =========================
+# ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   openclaw-data:
-  # searxng-data:
-  # registry-data:
+    driver: local
 
-
-# =========================
-# 🌐 NETWORKS
-# =========================
+# ── Networks ──────────────────────────────────────────────────────────────────
 networks:
   coolify:
     external: true
