@@ -135,7 +135,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
         "mode": "non-main",
         "scope": "session",
         "browser": {
-          "enabled": true
+          "enabled": false
         }
       }
     },
