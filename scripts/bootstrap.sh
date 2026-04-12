@@ -155,8 +155,11 @@ export OPENCLAW_STATE_DIR="$OPENCLAW_STATE"
 # ----------------------------
 # Sandbox setup
 # ----------------------------
-[ -f scripts/sandbox-setup.sh ] && bash scripts/sandbox-setup.sh
-[ -f scripts/sandbox-browser-setup.sh ] && bash scripts/sandbox-browser-setup.sh
+# Disable sandbox setup (no Docker available)
+if [ "$SANDBOX_CONTAINER" = "true" ]; then
+  [ -f scripts/sandbox-setup.sh ] && bash scripts/sandbox-setup.sh
+  [ -f scripts/sandbox-browser-setup.sh ] && bash scripts/sandbox-browser-setup.sh
+fi
 
 # ----------------------------
 # Recovery & Monitoring
