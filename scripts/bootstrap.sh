@@ -5,6 +5,7 @@ if [ -f "/app/scripts/migrate-to-data.sh" ]; then
     bash "/app/scripts/migrate-to-data.sh"
 fi
 
+OPENCLAW_GATEWAY_PORT=${OPENCLAW_GATEWAY_PORT:-18789}
 OPENCLAW_STATE="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 CONFIG_FILE="$OPENCLAW_STATE/openclaw.json"
 WORKSPACE_DIR="${OPENCLAW_WORKSPACE:-/data/openclaw-workspace}"
@@ -105,7 +106,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     }
   },
   "gateway": {
-  "port": $OPENCLAW_GATEWAY_PORT,
+  "port": ${OPENCLAW_GATEWAY_PORT:-18789},
   "mode": "local",
     "bind": "lan",
     "controlUi": {
@@ -123,7 +124,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
   },
   "agents": {
     "defaults": {
-      "workspace": "$WORKSPACE_DIR",
+      "workspace": "${WORKSPACE_DIR:-/data/openclaw-workspace}",
       "envelopeTimestamp": "on",
       "envelopeElapsed": "on",
       "cliBackends": {},
