@@ -1,99 +1,99 @@
+version: "3.9"
+
 services:
-  registry:
-    image: registry:2
-    restart: unless-stopped
-    volumes:
-      - registry-data:/var/lib/registry
-    environment:
-      REGISTRY_HTTP_SECRET: ${SERVICE_BASE64_REGISTRY}
+  # =========================
+  # 🔥 OPENCLAW (MAIN SERVICE)
+  # =========================
   openclaw:
     build:
       context: .
       args:
         - OPENCLAW_BETA=${OPENCLAW_BETA:-false}
-    restart: on-failure:10
+
+    container_name: openclaw
+    restart: unless-stopped
+
     ulimits:
       nofile:
         soft: 65535
         hard: 65535
+
     env_file:
       - .env
+
     environment:
-      DOCKER_HOST: tcp://docker-proxy:2375
-      OPENCLAW_ENABLE_WEBHOOK_PROXY: "1"
+      # =========================
+      # CORE
+      # =========================
       PORT: 18789
       NODE_ENV: production
-      NODE_OPTIONS: '--max-old-space-size=4096'
-      HOME: /data
-      TERM: xterm-256color
-      # Persistence: Command History
-      HISTFILE: /data/.bash_history
-      HISTSIZE: 50000
-      HISTSAVE: 50000
-      HISTCONTROL: ignoreboth
-      XDG_CONFIG_HOME: /data/.config
-      XDG_DATA_HOME: /data/.local/share
-      XDG_CACHE_HOME: /data/.cache
-      NPM_CONFIG_CACHE: /data/.npm
-      BUN_INSTALL: /data/.bun
-      # Map OpenClaw vars
-      OPENCLAW_GATEWAY_BIND: lan
-      OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18789}
-      # Tell the binary where to look for state/config
-      OPENCLAW_STATE_DIR: /data/.openclaw
-      OPENCLAW_WORKSPACE: /data/openclaw-workspace
+      NODE_OPTIONS: --max-old-space-size=1024
 
-      # API Keys injected from .env or Coolify
+      # =========================
+      # FREE LLM (NVIDIA)
+      # =========================
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      KIMI_API_KEY: ${KIMI_API_KEY}
-      OPENCODE_API_KEY: ${OPENCODE_API_KEY}
-      MOONSHOT_API_KEY: ${KIMI_API_KEY}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      SANDBOX_CONTAINER: ${SANDBOX_CONTAINER:-false}
-      
-      # Optional integrations
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
-      NANOBANANA_API_KEY: ${NANOBANANA_API_KEY}
-      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
 
-      SERVICE_URL_OPENCLAW_18789: null
-      SERVICE_URL_OPENCLAWWEBHOOK_8788: null
-      BASE_URL: 'https://${SERVICE_FQDN_OPENCLAW}'
-      PUBLIC_URL: 'https://${SERVICE_FQDN_OPENCLAW}'
-      # Bootstrap controls
-      OPENCLAW_AUTO_BOOTSTRAP: "1"
-      OPENCLAW_PRINT_ACCESS: "1"
-      GATEWAY_TRUSTED_PROXIES: '*'
-      # Fix for EMFILE/Inotify issues in Docker
+      # =========================
+      # SHARED DATABASES (Coolify internal)
+      # =========================
+      REDIS_URL: ${REDIS_URL}
+      MONGODB_URI: ${MONGODB_URI}
+      DATABASE_URL: ${DATABASE_URL}
+
+      # =========================
+      # STORAGE
+      # =========================
+      OPENCLAW_STATE_DIR: /data/.openclaw
+      OPENCLAW_WORKSPACE: /data/workspace
+
+      # =========================
+      # 🔒 SAFETY (IMPORTANT)
+      # =========================
+      DOCKER_HOST: ""
+      SANDBOX_CONTAINER: "false"
+
+      # =========================
+      # 💰 TOKEN OPTIMIZATION
+      # =========================
+      AGENTS_DEFAULTS_BOOTSTRAP_MAX_CHARS: 3000
+      AGENTS_DEFAULTS_CONTEXT_WINDOW_THRESHOLD: 0.5
+
+      # =========================
+      # 🧠 LOOP CONTROL
+      # =========================
+      MAX_ITERATIONS: 4
+      MAX_TOOL_CALLS: 6
+
+      # =========================
+      # 🌐 PUBLIC ACCESS
+      # =========================
+      BASE_URL: https://${SERVICE_FQDN_OPENCLAW}
+      PUBLIC_URL: https://${SERVICE_FQDN_OPENCLAW}
+
+      # =========================
+      # ⚙️ STABILITY FIXES
+      # =========================
       CHOKIDAR_USEPOLLING: "true"
-      # Public URL Access
 
-      CF_TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN}
-      # Deployment & Git
-      VERCEL_ORG_ID: ${VERCEL_ORG_ID}
-      VERCEL_PROJECT_ID: ${VERCEL_PROJECT_ID}
-      VERCEL_TOKEN: ${VERCEL_TOKEN}
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-      GITHUB_USERNAME: ${GITHUB_USERNAME}
-      GITHUB_EMAIL: ${GITHUB_EMAIL}
-      # Optional
-      OPENCLAW_BETA: ${OPENCLAW_BETA:-false}
+      # =========================
+      # 🤖 OPTIONAL (ENABLE LATER)
+      # =========================
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
 
     volumes:
       - openclaw-data:/data
-      - openclaw-config:/root/.openclaw
-      - openclaw-workspace:/root/openclaw-workspace
 
-      # Secure: Socket mount removed in favor of proxy
-      # - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "18789:18789"
 
-    depends_on:
-      - docker-proxy
+    networks:
+      - coolify
+      - zynithic-networks
 
     command: ["bash", "/app/scripts/bootstrap.sh"]
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18789/"]
       interval: 30s
@@ -101,42 +101,74 @@ services:
       retries: 3
       start_period: 120s
 
-  docker-proxy:
-    image: tecnativa/docker-socket-proxy:latest
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      # Security: Only enable necessary Docker APIs
-      POST: 1       # Create containers
-      CONTAINERS: 1 # List/manage containers
-      IMAGES: 1     # Pull images
-      NETWORKS: 1   # Connect to networks
-      INFO: 1       # Version check
-      VERSION: 1
-      EXEC: 1       # Run commands (exec)
-      EVENTS: 1     # Listen for events (if needed)
 
-  searxng:
-    build:
-      context: .
-      dockerfile: searxng/Dockerfile
-    restart: unless-stopped
-    volumes:
-      - searxng-data:/var/lib/searxng
-    environment:
-      SEARXNG_BASE_URL: http://searxng:8080
-      SEARXNG_SERVER_SECRET_KEY: ${SERVICE_BASE64_SEARXNG}
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
+  # =====================================
+  # ⚠️ OPTIONAL SERVICES (DISABLED FOR NOW)
+  # =====================================
 
+  # registry:
+  #   image: registry:2
+  #   restart: unless-stopped
+  #   volumes:
+  #     - registry-data:/var/lib/registry
+  #   environment:
+  #     REGISTRY_HTTP_SECRET: ${SERVICE_BASE64_REGISTRY}
+  #   networks:
+  #     - coolify
+
+
+  # docker-proxy:
+  #   image: tecnativa/docker-socket-proxy:latest
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   environment:
+  #     POST: 1
+  #     CONTAINERS: 1
+  #     IMAGES: 1
+  #     NETWORKS: 1
+  #     INFO: 1
+  #     VERSION: 1
+  #     EXEC: 1
+  #     EVENTS: 1
+  #   networks:
+  #     - coolify
+
+
+  # searxng:
+  #   build:
+  #     context: .
+  #     dockerfile: searxng/Dockerfile
+  #   restart: unless-stopped
+  #   volumes:
+  #     - searxng-data:/var/lib/searxng
+  #   environment:
+  #     SEARXNG_BASE_URL: http://searxng:8080
+  #     SEARXNG_SERVER_SECRET_KEY: ${SERVICE_BASE64_SEARXNG}
+  #   cap_drop:
+  #     - ALL
+  #   cap_add:
+  #     - CHOWN
+  #     - SETGID
+  #     - SETUID
+  #   networks:
+  #     - coolify
+
+
+# =========================
+# 📦 VOLUMES
+# =========================
 volumes:
   openclaw-data:
-  openclaw-config:
-  openclaw-workspace:
-  searxng-data:
-  registry-data:
+  # searxng-data:
+  # registry-data:
+
+
+# =========================
+# 🌐 NETWORKS
+# =========================
+networks:
+  coolify:
+    external: true
+  zynithic-networks:
+    external: true
