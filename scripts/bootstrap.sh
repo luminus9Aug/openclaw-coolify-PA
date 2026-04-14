@@ -77,6 +77,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
       "allowInsecureAuth": false,
       "allowedOrigins": [${ALLOWED_ORIGINS}]
     },
+    "trustedProxies": [
+      "10.0.0.0/8",
+      "127.0.0.1",
+      "::1"
+    ],
+    "corsOrigins": ["*"],
     "auth": { "mode": "token", "token": "${TOKEN}" }
   },
   "models": {
