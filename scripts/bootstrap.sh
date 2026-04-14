@@ -148,11 +148,10 @@ cat > "$CONFIG_FILE" <<EOF
     "port": $OPENCLAW_GATEWAY_PORT,
     "host": "0.0.0.0",
     "trustedProxies": [
-      "$TRAEFIK_IP",
-      $ADDITIONAL_TRUSTED_PROXIES,
-      10.0.1.2,
-      10.0.3.2,
-      10.0.2.2
+     "$TRAEFIK_IP",
+      "127.0.0.1",
+      "::1",
+      "10.0.0.0/8"
     ],
     "controlUi": {
       "enabled": true,
