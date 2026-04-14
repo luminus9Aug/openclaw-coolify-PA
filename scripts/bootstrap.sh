@@ -33,12 +33,22 @@ if [ -n "${SERVICE_FQDN_OPENCLAW:-}" ]; then
   ALLOWED_ORIGINS="$ALLOWED_ORIGINS, \"$ORIGIN\""
 fi
 
+# ------------------------------------------------------------------------------
 # 3. GENERATE MULTI-MODEL CONFIG
+# ------------------------------------------------------------------------------
 if [ ! -f "$CONFIG_FILE" ]; then
- echo "🏗️ Generating Multi-Model Zydra Config..."
- TOKEN=$(openssl rand -hex 24)
- [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
+ echo "🏗️ Upgrading Zydra Config while preserving identity..."
+ 
+ # Logic: Check for a migration backup first, then a random hex
+ if [ -f "${CONFIG_FILE}.migration.bak" ]; then
+    TOKEN=$(jq -r '.gateway.auth.token' "${CONFIG_FILE}.migration.bak")
+    echo "♻️ Existing Token Restored."
+ else
+    TOKEN=$(openssl rand -hex 24)
+    echo "🆕 New Token Generated."
+ fi
 
+ # Generate your 3-tier model config
  cat > "$CONFIG_FILE" <<EOF
 {
   "env": {
@@ -50,11 +60,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "mode": "local",
     "bind": "lan",
     "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12", "127.0.0.1"],
-    "controlUi": {
-      "enabled": true,
-      "allowInsecureAuth": false,
-      "allowedOrigins": [$ALLOWED_ORIGINS]
-    },
+    "controlUi": { "enabled": true, "allowInsecureAuth": false, "allowedOrigins": [$ALLOWED_ORIGINS] },
     "auth": { "mode": "token", "token": "$TOKEN" }
   },
   "agents": {
@@ -77,7 +83,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
       { "id": "zydra-growth", "name": "Zydra Growth", "model": "zydra-balanced" }
     ]
   },
-  "plugins": { "enabled": true, "entries": { "telegram": { "enabled": $TELEGRAM_ENABLED } } }
+  "plugins": { "enabled": true, "entries": { "telegram": { "enabled": true } } }
 }
 EOF
  chmod 600 "$CONFIG_FILE"
