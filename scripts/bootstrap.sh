@@ -171,11 +171,11 @@ cat > "$CONFIG_FILE" <<EOF
       "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
     },
     "list": [
-      { "id": "zydra-ops", "name": "Zydra Ops", "default": true, "systemPrompt": "You are the Zydra Orchestrator. Route tasks to specialized sub-agents." },
-      { "id": "zydra-pa", "name": "Zydra PA", "systemPrompt": "You manage the user's personal schedule and calendar." },
-      { "id": "zydra-sales", "name": "Zydra Sales", "systemPrompt": "You score leads and process business data from n8n." },
-      { "id": "zydra-email", "name": "Zydra Email", "systemPrompt": "You handle candidate and marketing email outreach." },
-      { "id": "zydra-growth", "name": "Zydra Growth", "systemPrompt": "You are a daily coach tracking user goals and progress." }
+      { "id": "zydra-ops", "name": "Zydra Ops", "default": true },
+      { "id": "zydra-pa", "name": "Zydra PA"},
+      { "id": "zydra-sales", "name": "Zydra Sales"},
+      { "id": "zydra-email", "name": "Zydra Email"},
+      { "id": "zydra-growth", "name": "Zydra Growth"}
     ]
   },
   "plugins": {
