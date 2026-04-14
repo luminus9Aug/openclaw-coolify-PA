@@ -42,95 +42,52 @@ for dir in .agents .ssh .config .local .cache .npm .bun .claude .kimi; do
     fi
 done
 
+
 # ------------------------------------------------------------------------------
-# 4. GENERATE CONFIG — only if it does not already exist
-#    This is the core fix: the config is ALWAYS written on a fresh volume,
-#    and NEVER overwritten on subsequent restarts (preserving user changes).
+# 4. GENERATE CONFIG — Updated for Zydra Multi-Agent + NVIDIA NIM
 # ------------------------------------------------------------------------------
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "🏗️  Fresh install detected — generating openclaw.json ..."
+ echo "🏗️ Fresh install detected — generating Zydra multi-agent config..."
 
-    # Generate a cryptographically secure random token
-    TOKEN=$(openssl rand -hex 24 2>/dev/null \
-        || node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+ TOKEN=$(openssl rand -hex 24 2>/dev/null || node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
+ 
+ # Determine telegram plugin state
+ [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
 
-    # Determine telegram plugin state based on env var
-    if [ -n "${TELEGRAM_BOT_TOKEN:-}" ]; then
-        TELEGRAM_ENABLED="true"
-    else
-        TELEGRAM_ENABLED="false"
-    fi
-
-    cat > "$CONFIG_FILE" <<EOF
+ cat > "$CONFIG_FILE" <<EOF
 {
-  "commands": {
-    "native": true,
-    "nativeSkills": true,
-    "text": true,
-    "bash": true,
-    "config": true,
-    "debug": true,
-    "restart": true,
-    "useAccessGroups": true
-  },
-  "plugins": {
-    "enabled": true,
-    "entries": {
-      "telegram": {
-        "enabled": $TELEGRAM_ENABLED
-      }
-    }
-  },
-  "skills": {
-    "allowBundled": ["*"],
-    "install": {
-      "nodeManager": "npm"
-    }
-  },
   "gateway": {
     "port": $OPENCLAW_GATEWAY_PORT,
-    "mode": "local",
-    "bind": "lan",
     "controlUi": {
       "enabled": true,
-      "allowInsecureAuth": false
+      "allowInsecureAuth": true,
+      "allowedOrigins": ["http://localhost:18789", "${BASE_URL:-}", "https://${SERVICE_FQDN_OPENCLAW:-}"]
     },
-    "trustedProxies": ["*"],
-    "tailscale": {
-      "mode": "off",
-      "resetOnExit": false
-    },
-    "auth": {
-      "mode": "token",
-      "token": "$TOKEN"
-    }
+    "auth": { "mode": "token", "token": "$TOKEN" }
+  },
+  "llm": {
+    "provider": "openai",
+    "baseUrl": "${OPENAI_BASE_URL:-https://integrate.api.nvidia.com/v1}",
+    "apiKey": "${OPENAI_API_KEY:-}"
   },
   "agents": {
-    "defaults": {
+    "defaults": { 
       "workspace": "$WORKSPACE_DIR",
-      "envelopeTimestamp": "on",
-      "envelopeElapsed": "on",
-      "cliBackends": {},
-      "heartbeat": {
-        "every": "1h"
-      },
-      "maxConcurrent": 4,
-      "sandbox": {
-        "mode": "non-main",
-        "scope": "session",
-        "browser": {
-          "enabled": false
-        }
-      }
+      "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
     },
     "list": [
-      {
-        "id": "main",
-        "default": true,
-        "name": "default",
-        "workspace": "$WORKSPACE_DIR"
-      }
+      { "id": "zydra-ops", "name": "Zydra Ops", "default": true, "systemPrompt": "You are the Zydra Orchestrator. Route tasks to specialized sub-agents." },
+      { "id": "zydra-pa", "name": "Zydra PA", "systemPrompt": "You manage the user's personal schedule and calendar." },
+      { "id": "zydra-sales", "name": "Zydra Sales", "systemPrompt": "You score leads and process business data from n8n." },
+      { "id": "zydra-email", "name": "Zydra Email", "systemPrompt": "You handle candidate and marketing email outreach." },
+      { "id": "zydra-growth", "name": "Zydra Growth", "systemPrompt": "You are a daily coach tracking user goals and progress." }
     ]
+  },
+  "plugins": { 
+    "enabled": true, 
+    "entries": { 
+      "telegram": { "enabled": $TELEGRAM_ENABLED, "token": "${TELEGRAM_BOT_TOKEN:-}", "defaultAgent": "zydra-ops" } 
+    } 
   }
 }
 EOF
