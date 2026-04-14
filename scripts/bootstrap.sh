@@ -67,9 +67,10 @@ if [ ! -f "$CONFIG_FILE" ]; then
   # Telegram enabled only if token is set
   [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
 
-  cat > "$CONFIG_FILE" <<EOF
+ cat > "$CONFIG_FILE" <<EOF
 {
   "gateway": {
+    "mode": "local",
     "port": ${OPENCLAW_GATEWAY_PORT},
     "controlUi": {
       "enabled": true,
@@ -137,10 +138,11 @@ if [ ! -f "$CONFIG_FILE" ]; then
       "dmPolicy": "pairing",
       "streaming": {
         "mode": "partial",
-        "chunkMode": "words"
+        "chunkMode": "length"
       }
     }
   },
+  "meta": {},
   "logging": {
     "redactSensitive": "tools"
   }
