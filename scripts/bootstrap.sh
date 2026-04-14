@@ -75,7 +75,7 @@ cat > "$CONFIG_FILE" <<EOF
   "gateway": {
     "mode": "local",
     "port": ${OPENCLAW_GATEWAY_PORT},
-    "trustedProxies": ["127.0.0.1", "172.16.0.0/12", "192.168.0.0/16"],
+    "trustedProxies": ["127.0.0.1", "10.0.1.0/24"],
     "controlUi": {
       "enabled": true,
       "allowInsecureAuth": false,
@@ -91,8 +91,7 @@ cat > "$CONFIG_FILE" <<EOF
         "apiKey": "${OPENAI_API_KEY}",
         "api": "openai-completions",
         "models": [
-          { "name": "Llama 3.3 70B", "id": "meta/llama-3.3-70b-instruct", "contextWindow": 128000 },
-          { "name": "Llama 3.1 8B", "id": "meta/llama-3.1-8b-instruct", "contextWindow": 128000 }
+          { "id": "meta/llama-3.3-70b-instruct", "name": "Llama 3.3 70B", "contextWindow": 128000 }
         ]
       }
     }
@@ -113,9 +112,7 @@ cat > "$CONFIG_FILE" <<EOF
       "botToken": "${TELEGRAM_BOT_TOKEN:-}",
       "streaming": { "mode": "partial", "chunkMode": "length" }
     }
-  },
-  "meta": {},
-  "logging": { "redactSensitive": "tools" }
+  }
 }
 EOF
 
