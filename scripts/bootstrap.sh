@@ -106,32 +106,27 @@ if [ ! -f "$CONFIG_FILE" ]; then
         "id": "zydra-ops",
         "name": "Zydra Ops",
         "default": true,
-        "model": { "primary": "openai/meta/llama-3.3-70b-instruct" },
-        "prompt": "You are Zydra Ops, the master orchestrator. Route requests to: zydra-pa (schedule/calendar), zydra-sales (leads from n8n), zydra-email (email outreach), zydra-growth (coaching/skill tracking). For multi-step tasks coordinate the sequence. Always confirm what you are routing and why. Be decisive."
+        "model": { "primary": "openai/meta/llama-3.3-70b-instruct" }
       },
       {
         "id": "zydra-pa",
         "name": "Zydra PA",
-        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" },
-        "prompt": "You are Zydra PA, a sharp personal assistant. Create, read, update, and delete calendar events. Always confirm time, date, and timezone before acting. Never assume AM/PM. Summarize the schedule on request."
+        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
       },
       {
         "id": "zydra-sales",
         "name": "Zydra Sales",
-        "model": { "primary": "openai/meta/llama-3.3-70b-instruct" },
-        "prompt": "You are Zydra Sales. Process raw lead data from n8n. For each lead: score High/Medium/Low with one-line reason, extract contact/budget/timeline/fit score 1-10, recommend single best next action. Output a clean ranked list. Flag dead leads immediately."
+        "model": { "primary": "openai/meta/llama-3.3-70b-instruct" }
       },
       {
         "id": "zydra-email",
         "name": "Zydra Email",
-        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" },
-        "prompt": "You are Zydra Email. Two personas: (1) Job Candidate — formal, achievement-focused, candidate email account. (2) Marketing — persuasive, value-driven, marketing email account. Always confirm persona before drafting. Show full draft and get approval before sending. Never mix accounts."
+        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
       },
       {
         "id": "zydra-growth",
         "name": "Zydra Growth",
-        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" },
-        "prompt": "You are Zydra Growth, a demanding personal development coach. Track daily learning, skills, and goals. Maintain a running log. Proactively check in via Telegram. Create weekly plans based on what was actually done. Ask hard questions when progress stalls. Give concrete next steps only."
+        "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
       }
     ]
   },
