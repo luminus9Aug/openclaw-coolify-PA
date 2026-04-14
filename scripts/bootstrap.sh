@@ -34,21 +34,18 @@ if [ -n "${SERVICE_FQDN_OPENCLAW:-}" ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 3. GENERATE MULTI-MODEL CONFIG
+# 3. GENERATE MULTI-MODEL CONFIG (Schema-Valid Version)
 # ------------------------------------------------------------------------------
 if [ ! -f "$CONFIG_FILE" ]; then
  echo "🏗️ Upgrading Zydra Config while preserving identity..."
  
- # Logic: Check for a migration backup first, then a random hex
+ # Restore Token from backup
  if [ -f "${CONFIG_FILE}.migration.bak" ]; then
     TOKEN=$(jq -r '.gateway.auth.token' "${CONFIG_FILE}.migration.bak")
-    echo "♻️ Existing Token Restored."
  else
     TOKEN=$(openssl rand -hex 24)
-    echo "🆕 New Token Generated."
  fi
 
- # Generate your 3-tier model config
  cat > "$CONFIG_FILE" <<EOF
 {
   "env": {
@@ -63,17 +60,15 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "controlUi": { "enabled": true, "allowInsecureAuth": false, "allowedOrigins": [$ALLOWED_ORIGINS] },
     "auth": { "mode": "token", "token": "$TOKEN" }
   },
+  "models": {
+    "zydra-ultra": { "id": "meta/llama-3.3-70b-instruct", "provider": "openai" },
+    "zydra-balanced": { "id": "meta/llama-3.1-70b-instruct", "provider": "openai" },
+    "zydra-fast": { "id": "meta/llama-3.1-8b-instruct", "provider": "openai" }
+  },
   "agents": {
     "defaults": { 
       "workspace": "$WORKSPACE_DIR",
-      "model": { 
-        "primary": "zydra-ultra",
-        "models": {
-          "zydra-ultra": { "id": "meta/llama-3.3-70b-instruct", "provider": "openai" },
-          "zydra-balanced": { "id": "meta/llama-3.1-70b-instruct", "provider": "openai" },
-          "zydra-fast": { "id": "meta/llama-3.1-8b-instruct", "provider": "openai" }
-        }
-      }
+      "model": "zydra-ultra"
     },
     "list": [
       { "id": "zydra-ops", "name": "Zydra Ops", "default": true, "model": "zydra-ultra" },
