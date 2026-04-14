@@ -70,12 +70,12 @@ if [ ! -f "$CONFIG_FILE" ]; then
 
   [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
 
- cat > "$CONFIG_FILE" <<EOF
+cat > "$CONFIG_FILE" <<EOF
 {
   "gateway": {
     "mode": "local",
     "port": ${OPENCLAW_GATEWAY_PORT},
-    "trustedProxies": ["${TRAEFIK_IP}", "127.0.0.1", "::1"],
+    "trustedProxies": ["127.0.0.1", "172.16.0.0/12", "192.168.0.0/16"],
     "controlUi": {
       "enabled": true,
       "allowInsecureAuth": false,
@@ -91,34 +91,26 @@ if [ ! -f "$CONFIG_FILE" ]; then
         "apiKey": "${OPENAI_API_KEY}",
         "api": "openai-completions",
         "models": [
-          { "name": "Llama 3.3 70B", "id": "meta/llama-3.3-70b-instruct", "contextWindow": 128000, "maxTokens": 4096 },
-          { "name": "Llama 3.1 70B", "id": "meta/llama-3.1-70b-instruct", "contextWindow": 128000, "maxTokens": 4096 },
-          { "name": "Llama 3.1 8B", "id": "meta/llama-3.1-8b-instruct",  "contextWindow": 128000, "maxTokens": 4096 }
+          { "name": "Llama 3.3 70B", "id": "meta/llama-3.3-70b-instruct", "contextWindow": 128000 },
+          { "name": "Llama 3.1 8B", "id": "meta/llama-3.1-8b-instruct", "contextWindow": 128000 }
         ]
       }
     }
   },
   "agents": {
-    "defaults": {
-      "workspace": "${WORKSPACE_DIR}",
-      "model": {
-        "primary": "openai/meta/llama-3.1-70b-instruct",
-        "fallbacks": ["openai/meta/llama-3.1-8b-instruct"]
-      }
-    },
     "list": [
-      { "id": "zydra-ops", "name": "Zydra Ops", "default": true, "model": { "primary": "openai/meta/llama-3.3-70b-instruct" } },
-      { "id": "zydra-pa", "name": "Zydra PA", "model": { "primary": "openai/meta/llama-3.1-70b-instruct" } },
-      { "id": "zydra-sales", "name": "Zydra Sales", "model": { "primary": "openai/meta/llama-3.3-70b-instruct" } },
-      { "id": "zydra-email", "name": "Zydra Email", "model": { "primary": "openai/meta/llama-3.1-70b-instruct" } },
-      { "id": "zydra-growth", "name": "Zydra Growth", "model": { "primary": "openai/meta/llama-3.1-70b-instruct" } }
+      {
+        "id": "zydra-ops",
+        "name": "Zydra Ops",
+        "default": true,
+        "model": { "primary": "openai/meta/llama-3.3-70b-instruct" }
+      }
     ]
   },
   "channels": {
     "telegram": {
       "enabled": ${TELEGRAM_ENABLED},
       "botToken": "${TELEGRAM_BOT_TOKEN:-}",
-      "dmPolicy": "pairing",
       "streaming": { "mode": "partial", "chunkMode": "length" }
     }
   },
