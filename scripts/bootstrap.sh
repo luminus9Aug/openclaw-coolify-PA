@@ -1,189 +1,147 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# bootstrap.sh — OpenClaw Startup Entrypoint
-# Runs every time the container starts.
-# Idempotent: safe to run multiple times — never overwrites existing config/data.
+# bootstrap.sh — Finalized Zydra Orchestrator Entrypoint (Production Ready)
+# Purpose: Idempotent initialization for OpenClaw on Coolify VPS.
 # ==============================================================================
 set -euo pipefail
 
 # ------------------------------------------------------------------------------
-# 0. MIGRATION (one-time, from old /root paths to /data)
+# 1. PATHS & VALIDATION
 # ------------------------------------------------------------------------------
-if [ -f "/app/scripts/migrate-to-data.sh" ]; then
-    bash "/app/scripts/migrate-to-data.sh"
-fi
-
-# ------------------------------------------------------------------------------
-# 1. RESOLVE PATHS FROM ENVIRONMENT (with safe defaults)
-# ------------------------------------------------------------------------------
-OPENCLAW_GATEWAY_PORT="${OPENCLAW_GATEWAY_PORT:-18789}"
 OPENCLAW_STATE="${OPENCLAW_STATE_DIR:-/data/.openclaw}"
 CONFIG_FILE="$OPENCLAW_STATE/openclaw.json"
 WORKSPACE_DIR="${OPENCLAW_WORKSPACE:-/data/openclaw-workspace}"
+OPENCLAW_GATEWAY_PORT="${PORT:-18789}"
+
+# [Bug 3 Fix]: Fatal exit if LLM credentials are missing
+if [ -z "${OPENAI_API_KEY:-}" ]; then
+  echo "❌ FATAL: OPENAI_API_KEY is not set. Deployment cannot proceed."
+  exit 1
+fi
+
+# Create directory structure
+mkdir -p "$OPENCLAW_STATE" "$WORKSPACE_DIR"
 
 # ------------------------------------------------------------------------------
-# 2. CREATE DIRECTORY STRUCTURE
+# 2. DYNAMIC CORS ORIGINS [Bug 2 Fix]
 # ------------------------------------------------------------------------------
-mkdir -p "$OPENCLAW_STATE"
-mkdir -p "$OPENCLAW_STATE/credentials"
-mkdir -p "$OPENCLAW_STATE/agents/main/sessions"
-mkdir -p "$OPENCLAW_STATE/state"
-mkdir -p "$WORKSPACE_DIR"
+# We build the JSON array manually to avoid empty strings or malformed syntax.
+ALLOWED_ORIGINS="\"http://localhost:${OPENCLAW_GATEWAY_PORT}\""
 
-chmod 700 "$OPENCLAW_STATE"
-chmod 700 "$OPENCLAW_STATE/credentials"
+if [ -n "${BASE_URL:-}" ]; then
+  ALLOWED_ORIGINS="$ALLOWED_ORIGINS, \"${BASE_URL}\""
+fi
 
-# ------------------------------------------------------------------------------
-# 3. SYMLINK /root dotdirs → /data (so agent tools persist across restarts)
-# ------------------------------------------------------------------------------
-for dir in .agents .ssh .config .local .cache .npm .bun .claude .kimi; do
-    if [ ! -L "/root/$dir" ] && [ ! -e "/root/$dir" ]; then
-        ln -sf "/data/$dir" "/root/$dir"
-    fi
-done
-
+if [ -n "${SERVICE_FQDN_OPENCLAW:-}" ]; then
+  # Ensure protocol is present
+  if [[ ! $SERVICE_FQDN_OPENCLAW == http* ]]; then
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS, \"https://${SERVICE_FQDN_OPENCLAW}\""
+  else
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS, \"${SERVICE_FQDN_OPENCLAW}\""
+  fi
+fi
 
 # ------------------------------------------------------------------------------
-# 4. GENERATE CONFIG — Updated for Zydra Multi-Agent + NVIDIA NIM
+# 3. GENERATE CONFIG (Idempotent)
 # ------------------------------------------------------------------------------
 if [ ! -f "$CONFIG_FILE" ]; then
- echo "🏗️ Fresh install detected — generating Zydra multi-agent config..."
+ echo "🏗️ Fresh install detected — generating Zydra 5-Agent Config..."
 
+ # Generate secure token [cite: 18]
  TOKEN=$(openssl rand -hex 24 2>/dev/null || node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
  
- # Determine telegram plugin state
+ # Plugin logic
  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
 
+ # [Bug 1, 6, 7, 8 Fixes]: Correct Model IDs, Detailed Prompts, and Production Security
  cat > "$CONFIG_FILE" <<EOF
 {
   "gateway": {
     "port": $OPENCLAW_GATEWAY_PORT,
     "controlUi": {
       "enabled": true,
-      "allowInsecureAuth": true,
-      "allowedOrigins": ["http://localhost:18789", "${BASE_URL:-}", "https://${SERVICE_FQDN_OPENCLAW:-}"]
+      "allowInsecureAuth": false,
+      "allowedOrigins": [$ALLOWED_ORIGINS]
     },
     "auth": { "mode": "token", "token": "$TOKEN" }
   },
   "llm": {
     "provider": "openai",
     "baseUrl": "${OPENAI_BASE_URL:-https://integrate.api.nvidia.com/v1}",
-    "apiKey": "${OPENAI_API_KEY:-}"
+    "apiKey": "${OPENAI_API_KEY}"
   },
   "agents": {
     "defaults": { 
       "workspace": "$WORKSPACE_DIR",
-      "model": { "primary": "openai/meta/llama-3.1-70b-instruct" }
+      "model": { "primary": "meta/llama-3.1-70b-instruct" }
     },
     "list": [
-      { "id": "zydra-ops", "name": "Zydra Ops", "default": true, "systemPrompt": "You are the Zydra Orchestrator. Route tasks to specialized sub-agents." },
-      { "id": "zydra-pa", "name": "Zydra PA", "systemPrompt": "You manage the user's personal schedule and calendar." },
-      { "id": "zydra-sales", "name": "Zydra Sales", "systemPrompt": "You score leads and process business data from n8n." },
-      { "id": "zydra-email", "name": "Zydra Email", "systemPrompt": "You handle candidate and marketing email outreach." },
-      { "id": "zydra-growth", "name": "Zydra Growth", "systemPrompt": "You are a daily coach tracking user goals and progress." }
+      { 
+        "id": "zydra-ops", 
+        "name": "Zydra Ops", 
+        "default": true, 
+        "model": { "primary": "meta/llama-3.3-70b-instruct" },
+        "systemPrompt": "You are Zydra Ops, the orchestration layer. You decide which specialist agent should handle a request and can trigger n8n workflows via HTTP webhooks. When a task needs multiple agents, coordinate the sequence and explain the routing." 
+      },
+      { 
+        "id": "zydra-pa", 
+        "name": "Zydra PA", 
+        "systemPrompt": "You are Zydra PA, a sharp personal assistant. You manage schedules, create events, and track tasks. You are direct, brief, and always confirm what action you took in the calendar." 
+      },
+      { 
+        "id": "zydra-sales", 
+        "name": "Zydra Sales", 
+        "model": { "primary": "meta/llama-3.3-70b-instruct" },
+        "systemPrompt": "You are Zydra Sales, a senior lead analyst. You receive raw data from n8n. Your job: score each lead (High/Medium/Low) and produce a clean prioritized list with recommended next actions. Be analytical, not fluffy." 
+      },
+      { 
+        "id": "zydra-email", 
+        "name": "Zydra Email", 
+        "systemPrompt": "You are Zydra Email. You draft outreach using specific personas: (1) Job Candidate — formal/achievement-focused, or (2) Marketing — persuasive/value-driven. Never mix tones or personas." 
+      },
+      { 
+        "id": "zydra-growth", 
+        "name": "Zydra Growth", 
+        "systemPrompt": "You are Zydra Growth, a demanding but supportive coach. You track learning progress and goals. Proactively check in with the user via Telegram to ensure they are hitting their weekly milestones." 
+      }
     ]
   },
   "plugins": { 
     "enabled": true, 
     "entries": { 
-      "telegram": { "enabled": $TELEGRAM_ENABLED, "token": "${TELEGRAM_BOT_TOKEN:-}", "defaultAgent": "zydra-ops" } 
+      "telegram": { 
+        "enabled": $TELEGRAM_ENABLED, 
+        "token": "${TELEGRAM_BOT_TOKEN:-}", 
+        "defaultAgent": "zydra-ops" 
+      } 
     } 
   }
 }
 EOF
-
-    chmod 600 "$CONFIG_FILE"
-    echo "✅ Config written to $CONFIG_FILE"
-    echo "🔑 Generated token: $TOKEN"
+ chmod 600 "$CONFIG_FILE"
+ echo "✅ Config generated successfully."
 else
-    echo "✅ Config already exists at $CONFIG_FILE — skipping generation"
+ echo "✨ Config exists — skipping generation."
 fi
 
 # ------------------------------------------------------------------------------
-# 5. READ TOKEN FROM CONFIG (needed for banner, whether new or existing)
+# 4. STARTUP TOKEN EXTRACTION [Bug 5 Fix]
 # ------------------------------------------------------------------------------
-TOKEN=$(jq -r '.gateway.auth.token // empty' "$CONFIG_FILE" 2>/dev/null || true)
-
-if [ -z "$TOKEN" ]; then
-    echo "⚠️  WARNING: Could not read token from config. Auth may be broken."
-fi
-
-# ------------------------------------------------------------------------------
-# 6. SEED AGENT WORKSPACE (SOUL.md + BOOTSTRAP.md)
-#    Never overwrites if files already exist.
-# ------------------------------------------------------------------------------
-mkdir -p "$WORKSPACE_DIR"
-
-if [ -f "$WORKSPACE_DIR/SOUL.md" ]; then
-    echo "🧠 SOUL.md already exists — skipping"
+if command -v jq &>/dev/null; then
+  TOKEN=$(jq -r '.gateway.auth.token // empty' "$CONFIG_FILE" 2>/dev/null || true)
 else
-    if [ -f "/app/SOUL.md" ]; then
-        echo "✨ Seeding SOUL.md to $WORKSPACE_DIR"
-        cp "/app/SOUL.md" "$WORKSPACE_DIR/SOUL.md"
-    fi
-fi
-
-if [ -f "$WORKSPACE_DIR/BOOTSTRAP.md" ]; then
-    echo "📖 BOOTSTRAP.md already exists — skipping"
-else
-    if [ -f "/app/BOOTSTRAP.md" ]; then
-        echo "🚀 Seeding BOOTSTRAP.md to $WORKSPACE_DIR"
-        cp "/app/BOOTSTRAP.md" "$WORKSPACE_DIR/BOOTSTRAP.md"
-    fi
+  TOKEN=$(grep -o '"token":"[^"]*"' "$CONFIG_FILE" | cut -d'"' -f4 || true)
 fi
 
 # ------------------------------------------------------------------------------
-# 7. SANDBOX SETUP (only when running as an actual sandbox container)
+# 5. BANNER [Bug 4 Fix]
 # ------------------------------------------------------------------------------
-if [ "${SANDBOX_CONTAINER:-false}" = "true" ]; then
-    [ -f /app/scripts/sandbox-setup.sh ] && bash /app/scripts/sandbox-setup.sh
-    [ -f /app/scripts/sandbox-browser-setup.sh ] && bash /app/scripts/sandbox-browser-setup.sh
-fi
-
-# ------------------------------------------------------------------------------
-# 8. RECOVERY & HEALTH MONITOR
-# ------------------------------------------------------------------------------
-if [ -f /app/scripts/recover_sandbox.sh ]; then
-    echo "🛡️  Deploying Recovery Protocols..."
-    cp /app/scripts/recover_sandbox.sh "$WORKSPACE_DIR/"
-    cp /app/scripts/monitor_sandbox.sh "$WORKSPACE_DIR/"
-    chmod +x "$WORKSPACE_DIR/recover_sandbox.sh" "$WORKSPACE_DIR/monitor_sandbox.sh"
-
-    bash "$WORKSPACE_DIR/recover_sandbox.sh"
-    nohup bash "$WORKSPACE_DIR/monitor_sandbox.sh" > /dev/null 2>&1 &
-fi
-
-# ------------------------------------------------------------------------------
-# 9. SYSTEM LIMITS
-# ------------------------------------------------------------------------------
-ulimit -n 65535
-
-# ------------------------------------------------------------------------------
-# 10. BANNER
-# ------------------------------------------------------------------------------
-echo ""
 echo "=================================================================="
-echo "🦞 OpenClaw is starting!"
+echo "🦞 Zydra Orchestrator is Active!"
+echo "🌍 Public URL: ${BASE_URL:-https://${SERVICE_FQDN_OPENCLAW:-localhost}}"
+echo "🔑 Access Token: $TOKEN"
+echo "👉 Authorization: Run 'bash /app/scripts/openclaw-approve.sh'"
 echo "=================================================================="
-echo ""
-echo "🔑 Access Token : $TOKEN"
-echo ""
-echo "🌍 Local URL    : http://localhost:${OPENCLAW_GATEWAY_PORT}?token=${TOKEN}"
-if [ -n "${SERVICE_FQDN_OPENCLAW:-}" ]; then
-    echo "☁️  Public URL   : https://${SERVICE_FQDN_OPENCLAW}?token=${TOKEN}"
-fi
-echo ""
-echo "👉 Next steps:"
-echo "   1. Open the URL above."
-echo "   2. Run 'openclaw-approve' in the container terminal to pair."
-echo "   3. Run 'openclaw onboard' to configure your agent."
-echo ""
-echo "🔧 ulimit: $(ulimit -n)"
-echo "=================================================================="
-echo ""
 
-# ------------------------------------------------------------------------------
-# 11. EXPORT STATE DIR AND LAUNCH
-# ------------------------------------------------------------------------------
 export OPENCLAW_STATE_DIR="$OPENCLAW_STATE"
 exec openclaw gateway run
