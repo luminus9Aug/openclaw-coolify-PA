@@ -34,13 +34,15 @@ if [ -n "${SERVICE_FQDN_OPENCLAW:-}" ]; then
   ALLOWED_ORIGINS="$ALLOWED_ORIGINS, \"$ORIGIN\""
 fi
 
-# 4. GENERATE SCHEMA-VALID CONFIG (Idempotent)
+# ------------------------------------------------------------------------------
+# 4. GENERATE SCHEMA-VALID CONFIG (Zydra Stability Fix v2)
+# ------------------------------------------------------------------------------
 if [ ! -f "$CONFIG_FILE" ]; then
  echo "🏗️ Generating Valid Zydra Config..."
  TOKEN=$(openssl rand -hex 24 2>/dev/null || node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")
  [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && TELEGRAM_ENABLED="true" || TELEGRAM_ENABLED="false"
 
- # VALIDATED SCHEMA: No unrecognized keys like 'llm' or 'systemPrompt'
+ # VALIDATED SCHEMA: Added 'mode' and 'bind' to gateway to prevent startup block
  cat > "$CONFIG_FILE" <<EOF
 {
   "env": {
@@ -49,6 +51,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
   },
   "gateway": {
     "port": $OPENCLAW_GATEWAY_PORT,
+    "mode": "local",
+    "bind": "lan",
     "controlUi": {
       "enabled": true,
       "allowInsecureAuth": false,
